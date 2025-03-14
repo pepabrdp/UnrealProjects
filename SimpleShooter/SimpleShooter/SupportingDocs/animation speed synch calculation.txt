@@ -1,0 +1,27 @@
+**JOG**
+vel_feet = (dist_yEND - yBEG) / (timeEND - timeBEG )
+
+yBEG = 42.911
+timeBEG = 0.26
+
+yEND = -40.547
+timeEND = 0.44
+
+-83.458
+0.18
+
+val_feet = -463.65555555555555555555555555556
+
+**WALK**
+vel_feet = (dist_yEND - yBEG) / (timeEND - timeBEG )
+
+yBEG = 29.634
+timeBEG = 1.38
+
+yEND = -34.741
+timeEND = 1.87
+
+-64.375
+0.49
+
+val_feet = -131.37755102040816326530612244898
