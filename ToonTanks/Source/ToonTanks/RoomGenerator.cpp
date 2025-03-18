@@ -26,10 +26,6 @@ void ARoomGenerator::Tick(float DeltaTime)
 
 }
 
-void ARoomGenerator::SetGrid(AGrid* grid)
-{
-	Grid = grid;
-}
 
 void ARoomGenerator::Generate()
 {

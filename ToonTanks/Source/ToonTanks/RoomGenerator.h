@@ -21,9 +21,6 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	UFUNCTION()
-	void SetGrid(AGrid* grid);
-
-	UFUNCTION()
 	void Generate();
 
 protected:
@@ -34,7 +31,4 @@ private:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Room", BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	int NumRooms = 10;
-
-	UPROPERTY(VisibleAnywhere, Category = "Grid", BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	AGrid* Grid;
 };

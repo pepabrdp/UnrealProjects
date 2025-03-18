@@ -3,6 +3,11 @@
 
 #include "Grid.h"
 #include "RoomGenerator.h"
+#include "DrawDebugHelpers.h"
+#include "MST.h"
+#include "Delaunay/delaunator.hpp"
+#include "HallwayGenerator.h"
+using namespace std;
 
 // Sets default values
 AGrid::AGrid()
@@ -28,7 +33,18 @@ void AGrid::BeginPlay()
 	RoomGenerator->SetOwner(this);
 	RoomGenerator->Generate();
 	DisplayDebugGrid();
-
+	DelaunayTriangulation();
+	MST MinimumSpanningTree = MST::MST(DelaunayCordinates, DelaunayTriangles,GetLookUpCorrdinatesToRoomTable());
+	MSTFinalEdges = MinimumSpanningTree.GetMSTFinalEdges();
+	DisplayMSTTree();
+	AHallwayGenerator* HallwayGenerator = GetWorld()->SpawnActor<AHallwayGenerator>(HallwayGeneratorClass,GetActorLocation(),GetActorRotation());
+	if(!HallwayGenerator)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Hallway Generator is not spawned"));
+		return;
+	}
+	HallwayGenerator->SetOwner(this);
+	HallwayGenerator->GenerateHallways();
 }
 
 // Called every frame
@@ -89,10 +105,93 @@ void AGrid::PlaceRoomAtCoordinate(int X, int Y)
 		UE_LOG(LogTemp, Error, TEXT("Room is not spawned"));
 		return;
 	}
+	RoomsPlacedArray.Add(Room);
 }
 
 
 int AGrid::GetOccupiedCell(int X, int Y) const
 {
 	return GridArray[(X) * LenY + (Y)];
+}
+
+void AGrid::DelaunayTriangulation()
+{
+	TArray<double> InputCoordinates = ConstructDelaunayInputArray();
+	std::vector<double> InputCoordinatesVector(InputCoordinates.GetData(), InputCoordinates.GetData() + InputCoordinates.Num());
+	delaunator::Delaunator d(InputCoordinatesVector);
+	for(std::size_t i = 0; i < d.triangles.size(); i+=3) {
+		UE_LOG(LogTemp, Log, TEXT("Triangle points: [[%f, %f], [%f, %f], [%f, %f]]"),
+			d.coords[2 * d.triangles[i]],        //tx0
+			d.coords[2 * d.triangles[i] + 1],    //ty0
+			d.coords[2 * d.triangles[i + 1]],    //tx1
+			d.coords[2 * d.triangles[i + 1] + 1],//ty1
+			d.coords[2 * d.triangles[i + 2]],    //tx2
+			d.coords[2 * d.triangles[i + 2] + 1] //ty2
+		);
+		//Edge X0->X1
+		DrawDebugLine(GetWorld(), FVector(d.coords[2 * d.triangles[i]],d.coords[2 * d.triangles[i] + 1], 0), FVector(d.coords[2 * d.triangles[i + 1]], d.coords[2 * d.triangles[i + 1] + 1], 0), FColor::Green, true, -1, 0, 5);
+		//Edge X0->X2
+		DrawDebugLine(GetWorld(), FVector(d.coords[2 * d.triangles[i]],d.coords[2 * d.triangles[i] + 1], 0), FVector(d.coords[2 * d.triangles[i + 2]], d.coords[2 * d.triangles[i + 2] + 1], 0), FColor::Green, true, -1, 0, 5);
+		//Edge X1->X2
+		DrawDebugLine(GetWorld(), FVector(d.coords[2 * d.triangles[i + 1]], d.coords[2 * d.triangles[i + 1] + 1], 0), FVector(d.coords[2 * d.triangles[i + 2]], d.coords[2 * d.triangles[i + 2] + 1], 0), FColor::Green, true, -1, 0, 5);
+    }
+	DelaunayCordinates = d.coords;
+	DelaunayTriangles = d.triangles;
+}
+
+TArray<double> AGrid::ConstructDelaunayInputArray()
+{
+	TArray<double> InputCoordinates;
+	for(AActor* Room : RoomsPlacedArray)
+	{
+		FVector RoomLocation = Room->GetActorLocation();
+		InputCoordinates.Add(RoomLocation.X);
+		InputCoordinates.Add(RoomLocation.Y);
+	}
+	return InputCoordinates;
+}
+
+void AGrid::DebugPrintArray(TArray<double> Array)
+{
+	for(int i = 0; i < Array.Num(); i++)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Array[%d] = %f"), i, Array[i]);
+	}
+}
+
+TMap<FVector2D, class AActor*> AGrid::GetLookUpCorrdinatesToRoomTable() const
+{
+	TMap<FVector2D, class AActor*> LookUpCorrdinatesToRoomTable;
+	for(AActor* Room : RoomsPlacedArray)
+	{
+		FVector RoomLocation = Room->GetActorLocation();
+		LookUpCorrdinatesToRoomTable.Add({FVector2D(RoomLocation.X, RoomLocation.Y), Room});
+	}
+	if(LookUpCorrdinatesToRoomTable.Num() != RoomsPlacedArray.Num())
+	{
+		UE_LOG(LogTemp, Error, TEXT("LookUpCorrdinatesToRoomTable size is not equal to RoomsPlacedArray size"));
+	}
+	return LookUpCorrdinatesToRoomTable;
+}
+
+void AGrid::DisplayMSTTree()
+{
+	for(TTuple<AActor*, AActor*> Elem : MSTFinalEdges)
+	{
+		
+		UE_LOG(LogTemp, Log, TEXT("Room1: %s, Room2: %s"), *(Elem.Get<0>()->GetFName().ToString()),Elem.Get<1>() == nullptr? TEXT("nullptr") : *(Elem.Get<1>()->GetFName().ToString()));
+		if(Elem.Get<1>())
+		{
+			DrawDebugLine(GetWorld(), Elem.Get<0>()->GetActorLocation(), Elem.Get<1>()->GetActorLocation(), FColor::Red, true, -1, 0, 15);
+		}
+	}
+}
+TArray<TTuple<AActor*, AActor*>> AGrid::GetMSTFinalEdges() const
+{
+	return MSTFinalEdges;
+}
+
+float AGrid::GetCellSize() const
+{
+	return CellSize;
 }
